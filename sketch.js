@@ -118,8 +118,9 @@ function draw() {
 
     // Draw the target label to be selected in the current trial
     textFont("Arial", 40);
+    fill(color(255, 255, 255));
     textAlign(CENTER);
-    text(legendas[trials[current_trial]], width / 2, height - 20);
+    text(legendas[trials[current_trial]], width / 2, height - 30);
   }
 }
 
