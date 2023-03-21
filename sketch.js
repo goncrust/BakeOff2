@@ -1,12 +1,5 @@
-// Bakeoff #2 -- Seleção em Interfaces Densas
-// IPM 2022-23, Período 3
-// Entrega: até dia 31 de Março às 23h59 através do Fenix
-// Bake-off: durante os laboratórios da semana de 10 de Abril
-
-// p5.js reference: https://p5js.org/reference/
-
 // Database (CHANGE THESE!)
-const GROUP_NUMBER = 0; // Add your group number here as an integer (e.g., 2, 3)
+const GROUP_NUMBER = 40;
 const RECORD_TO_FIREBASE = false; // Set to 'true' to record user results to Firebase
 
 // Pixel density and setup variables (DO NOT CHANGE!)
@@ -15,7 +8,8 @@ const NUM_OF_TRIALS = 12; // The numbers of trials (i.e., target selections) to 
 const GRID_ROWS = 8; // We divide our 80 targets in a 8x10 grid
 const GRID_COLUMNS = 10; // We divide our 80 targets in a 8x10 grid
 let continue_button;
-let legendas; // The item list from the "legendas" CSV
+let legendas_table; // The item list from the "legendas" CSV
+let legendas; // Name column from the table, sorted
 
 // Metrics
 let testStartTime, testEndTime; // time between the start and end of one attempt (8 trials)
@@ -30,7 +24,7 @@ let current_trial = 0; // the current trial number (indexes into trials array ab
 let attempt = 0; // users complete each test twice to account for practice (attemps 0 and 1)
 
 // Intervals and letters
-const letter_intervals = ["0%", "a-b", "c-k", "l-o", "p-r", "s-z"];
+const letter_intervals = ["0%", "A-B", "C-K", "L-O", "P-R", "S-Z"];
 const letters = [
   "A",
   "B",
@@ -60,24 +54,45 @@ const letters = [
   "Z",
 ];
 
-// Target lists
-let intervals_targets = [];
-let symbols = [];
-let zero_percent = [];
-let a_b_targets = [];
-let c_k_targets = [];
-let l_o_targets = [];
-let p_r_targets = [];
-let s_z_targets = [];
-const targets = new Map();
+// Target list
+let targets = {};
+
+// State
+let opened_intervals = {};
+let opened_letters = {};
+
+function close_intervals() {
+  for (const interval of letter_intervals) opened_intervals[interval] = false;
+}
+
+function close_letters() {
+  for (const letter of letters) opened_letters[letter] = false;
+}
+
+function open_interval(interval) {
+  close_intervals();
+  close_letters();
+
+  opened_intervals[interval] = true;
+}
+
+function open_letter(letter) {
+  close_letters();
+  opened_letters[letter] = true;
+}
 
 // Ensures important data is loaded before the program starts
 function preload() {
-  legendas = loadTable("legendas.csv", "csv", "header");
+  table = loadTable("legendas.csv", "csv", "header");
 }
 
 // Runs once at the start
 function setup() {
+  legendas = table.getColumn("name").sort();
+
+  close_intervals();
+  close_letters();
+
   createCanvas(700, 500); // window size in px before we go into fullScreen()
   frameRate(60); // frame rate (DO NOT CHANGE!)
 
@@ -97,13 +112,28 @@ function draw() {
     textAlign(LEFT);
     text("Trial " + (current_trial + 1) + " of " + trials.length, 50, 20);
 
-    // Draw all targets
-    for (let i = 0; i < legendas.getRowCount(); i++) targets[i].draw();
+    // Draw all targets, traversing the target object
+    for (let i = 0; i < letter_intervals.length; i++) {
+      targets[letter_intervals[i]].target.draw();
+      if (opened_intervals[letter_intervals[i]]) {
+        for (const letter in targets[letter_intervals[i]].children) {
+          targets[letter_intervals[i]].children[letter].target.draw();
+          if (opened_letters[letter] && letter_intervals[i] != "0%") {
+            for (const word in targets[letter_intervals[i]].children[letter]
+              .children) {
+              targets[letter_intervals[i]].children[letter].children[
+                word
+              ].target.draw();
+            }
+          }
+        }
+      }
+    }
 
     // Draw the target label to be selected in the current trial
     textFont("Arial", 20);
     textAlign(CENTER);
-    text(legendas.getString(trials[current_trial], 0), width / 2, height - 20);
+    text(legendas[trials[current_trial]], width / 2, height - 20);
   }
 }
 
@@ -188,15 +218,40 @@ function mousePressed() {
   // Only look for mouse releases during the actual test
   // (i.e., during target selections)
   if (draw_targets) {
-    for (let i = 0; i < legendas.getRowCount(); i++) {
-      // Check if the user clicked over one of the targets
-      if (targets[i].clicked(mouseX, mouseY)) {
-        // Checks if it was the correct target
-        if (targets[i].id === trials[current_trial]) hits++;
-        else misses++;
-
-        current_trial++; // Move on to the next trial/target
+    // Check if the user clicked over one of the targets
+    for (let i = 0; i < letter_intervals.length; i++) {
+      if (targets[letter_intervals[i]].target.clicked(mouseX, mouseY)) {
+        open_interval(letter_intervals[i]);
         break;
+      } else if (opened_intervals[letter_intervals[i]]) {
+        for (const letter in targets[letter_intervals[i]].children) {
+          if (
+            targets[letter_intervals[i]].children[letter].target.clicked(
+              mouseX,
+              mouseY
+            )
+          ) {
+            open_letter(letter);
+            break;
+          } else if (opened_letters[letter]) {
+            for (const word in targets[letter_intervals[i]].children[letter]
+              .children) {
+              if (
+                targets[letter_intervals[i]].children[letter].children[
+                  word
+                ].target.clicked(mouseX, mouseY)
+              ) {
+                if (word === table.getRow(trials[current_trial])[0]) hits++;
+                else misses++;
+
+                current_trial++;
+                close_intervals();
+                close_letters();
+                break;
+              }
+            }
+          }
+        }
       }
     }
 
@@ -224,6 +279,9 @@ function mousePressed() {
 
 // Evoked after the user starts its second (and last) attempt
 function continueTest() {
+  close_intervals();
+  close_letters();
+
   // Re-randomize the trial order
   randomizeTrials();
 
@@ -240,70 +298,103 @@ function continueTest() {
 
 // Creates and positions the UI targets
 function createTargets(target_size, horizontal_gap, vertical_gap) {
+  let offset = 0;
   // Define the margins between targets by dividing the white space
   // for the number of targets minus one
   h_margin = horizontal_gap / (GRID_COLUMNS - 1);
   v_margin = vertical_gap / (GRID_ROWS - 1);
 
   // Intervals
-  for (let r = 1; r < 6; r++) {
-    let target_x = 40 + (h_margin + target_size) + target_size / 2;
-    let target_y = (v_margin + target_size) * r + target_size / 2;
+  for (let c = 1; c < 7; c++) {
+    let target_x = 40 + (h_margin + target_size) * c + target_size / 2;
+    let target_y = v_margin + target_size + target_size / 2;
 
     // Find the appropriate label and ID for this target
-    let intervals_index = r - 1;
+    let intervals_index = c - 1;
     let target_label = letter_intervals[intervals_index];
-    let target_id = intervals_index;
 
-    let target = new Target(
-      target_x,
-      target_y + 40,
-      target_size,
-      target_label,
-      target_id
-    );
-    intervals_targets.push(target);
+    let target = new Target(target_x, target_y + 40, target_size, target_label);
+
+    targets[target_label] = { target: target, children: {} };
   }
 
   // Letters
-  for (let r = 4; r < 6; r++) {
-    let target_x = 40 + (h_margin + target_size) + target_size / 2;
-    let target_y = (v_margin + target_size) * r + target_size / 2;
+  for (let i = 0; i < letters.length; i++) {
+    // Find the appropriate label for this target
+    let target_label = letters[i];
 
-    // Find the appropriate label and ID for this target
-    let letters_index = r - 1;
-    let target_label = letters[letters_index];
-    let target_id = letters_index;
+    if (
+      target_label == "A" ||
+      target_label == "C" ||
+      target_label == "L" ||
+      target_label == "P" ||
+      target_label == "S"
+    ) {
+      offset = 0;
+    }
 
-    let target = new Target(
-      target_x,
-      target_y + 40,
-      target_size,
-      target_label,
-      target_id
-    );
-    letters_targets.push(target);
+    let target_x = 40 + (h_margin + target_size) * offset + target_size / 2;
+    let target_y = (v_margin + target_size) * 3 + target_size / 2;
+
+    let target = new Target(target_x, target_y + 40, target_size, target_label);
+
+    if (target_label >= "A" && target_label <= "B") {
+      targets["A-B"].children[target_label] = { target: target, children: {} };
+    } else if (target_label >= "C" && target_label <= "K") {
+      targets["C-K"].children[target_label] = { target: target, children: {} };
+    } else if (target_label >= "L" && target_label <= "O") {
+      targets["L-O"].children[target_label] = { target: target, children: {} };
+    } else if (target_label >= "P" && target_label <= "R") {
+      targets["P-R"].children[target_label] = { target: target, children: {} };
+    } else {
+      targets["S-Z"].children[target_label] = { target: target, children: {} };
+    }
+
+    offset++;
   }
 
-  // Set targets in a 8 x 10 grid
-  for (let r = 0; r < GRID_ROWS; r++) {
-    for (let c = 0; c < GRID_COLUMNS; c++) {
-      let target_x = 40 + (h_margin + target_size) * c + target_size / 2; // give it some margin from the left border
-      let target_y = (v_margin + target_size) * r + target_size / 2;
+  // Words
+  offset = 0;
+  let r = 3;
+  let current_letter = legendas[0][0];
+  for (let i = 0; i < legendas.length; i++) {
+    if (legendas[i][0] != current_letter) {
+      current_letter = legendas[i][0];
+      offset = 0;
+      r = 5;
+    }
 
-      // Find the appropriate label and ID for this target
-      let legendas_index = c + GRID_COLUMNS * r;
-      let target_label = legendas.getString(legendas_index, 0);
-      let target_id = legendas.getNum(legendas_index, 1);
+    let target_x = 40 + (h_margin + target_size) * offset + target_size / 2; // give it some margin from the left border
+    let target_y = (v_margin + target_size) * r + target_size / 2;
+    let target = new Target(target_x, target_y + 40, target_size, legendas[i]);
 
-      let target = new Target(
-        target_x,
-        target_y + 40,
-        target_size,
-        target_label,
-        target_id
-      );
-      targets.push(target);
+    if (current_letter == "0") {
+      targets["0%"].children[legendas[i]] = { target: target };
+    } else if (current_letter >= "A" && current_letter <= "B") {
+      targets["A-B"].children[current_letter].children[legendas[i]] = {
+        target: target,
+      };
+    } else if (current_letter >= "C" && current_letter <= "K") {
+      targets["C-K"].children[current_letter].children[legendas[i]] = {
+        target: target,
+      };
+    } else if (current_letter >= "L" && current_letter <= "O") {
+      targets["L-O"].children[current_letter].children[legendas[i]] = {
+        target: target,
+      };
+    } else if (current_letter >= "P" && current_letter <= "R") {
+      targets["P-R"].children[current_letter].children[legendas[i]] = {
+        target: target,
+      };
+    } else {
+      targets["S-Z"].children[current_letter].children[legendas[i]] = {
+        target: target,
+      };
+    }
+    offset++;
+    if (offset > GRID_COLUMNS) {
+      offset = 0;
+      r++;
     }
   }
 }
