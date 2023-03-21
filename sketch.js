@@ -23,9 +23,9 @@ let trials; // contains the order of targets that activate in the test
 let current_trial = 0; // the current trial number (indexes into trials array above)
 let attempt = 0; // users complete each test twice to account for practice (attemps 0 and 1)
 
-// Intervals and letters
-const letter_intervals = ["0%", "A-B", "C-K", "L-O", "P-R", "S-Z"];
+// Letters
 const letters = [
+  "0",
   "A",
   "B",
   "C",
@@ -58,27 +58,18 @@ const letters = [
 let targets = {};
 
 // State
-let opened_intervals = {};
-let opened_letters = {};
+let opened_letter = "";
 
-function close_intervals() {
-  for (const interval of letter_intervals) opened_intervals[interval] = false;
-}
-
-function close_letters() {
-  for (const letter of letters) opened_letters[letter] = false;
-}
-
-function open_interval(interval) {
-  close_intervals();
-  close_letters();
-
-  opened_intervals[interval] = true;
+function close_letter() {
+  opened_letter = "";
 }
 
 function open_letter(letter) {
-  close_letters();
-  opened_letters[letter] = true;
+  opened_letter = letter;
+}
+
+function is_open(letter) {
+  return letter == opened_letter;
 }
 
 // Ensures important data is loaded before the program starts
@@ -90,8 +81,7 @@ function preload() {
 function setup() {
   legendas = table.getColumn("name").sort();
 
-  close_intervals();
-  close_letters();
+  close_letter();
 
   createCanvas(700, 500); // window size in px before we go into fullScreen()
   frameRate(60); // frame rate (DO NOT CHANGE!)
@@ -107,31 +97,27 @@ function draw() {
     background(color(0, 0, 0)); // sets background to black
 
     // Print trial count at the top left-corner of the canvas
-    textFont("Arial", 16);
+    textFont("Arial", 32);
     fill(color(255, 255, 255));
-    textAlign(LEFT);
-    text("Trial " + (current_trial + 1) + " of " + trials.length, 50, 20);
+    textAlign(CENTER);
+    text(
+      "Trial " + (current_trial + 1) + " of " + trials.length,
+      width / 2,
+      30
+    );
 
     // Draw all targets, traversing the target object
-    for (let i = 0; i < letter_intervals.length; i++) {
-      targets[letter_intervals[i]].target.draw();
-      if (opened_intervals[letter_intervals[i]]) {
-        for (const letter in targets[letter_intervals[i]].children) {
-          targets[letter_intervals[i]].children[letter].target.draw();
-          if (opened_letters[letter] && letter_intervals[i] != "0%") {
-            for (const word in targets[letter_intervals[i]].children[letter]
-              .children) {
-              targets[letter_intervals[i]].children[letter].children[
-                word
-              ].target.draw();
-            }
-          }
+    for (const letter in targets) {
+      targets[letter].target.draw();
+      if (is_open(letter)) {
+        for (const word in targets[letter].children) {
+          targets[letter].children[word].target.draw();
         }
       }
     }
 
     // Draw the target label to be selected in the current trial
-    textFont("Arial", 20);
+    textFont("Arial", 40);
     textAlign(CENTER);
     text(legendas[trials[current_trial]], width / 2, height - 20);
   }
@@ -219,37 +205,19 @@ function mousePressed() {
   // (i.e., during target selections)
   if (draw_targets) {
     // Check if the user clicked over one of the targets
-    for (let i = 0; i < letter_intervals.length; i++) {
-      if (targets[letter_intervals[i]].target.clicked(mouseX, mouseY)) {
-        open_interval(letter_intervals[i]);
+    for (const letter in targets) {
+      if (targets[letter].target.clicked(mouseX, mouseY)) {
+        open_letter(letter);
         break;
-      } else if (opened_intervals[letter_intervals[i]]) {
-        for (const letter in targets[letter_intervals[i]].children) {
-          if (
-            targets[letter_intervals[i]].children[letter].target.clicked(
-              mouseX,
-              mouseY
-            )
-          ) {
-            open_letter(letter);
-            break;
-          } else if (opened_letters[letter]) {
-            for (const word in targets[letter_intervals[i]].children[letter]
-              .children) {
-              if (
-                targets[letter_intervals[i]].children[letter].children[
-                  word
-                ].target.clicked(mouseX, mouseY)
-              ) {
-                if (word === table.getRow(trials[current_trial])[0]) hits++;
-                else misses++;
+      } else if (is_open(letter)) {
+        for (const word in targets[letter].children) {
+          if (targets[letter].children[word].target.clicked(mouseX, mouseY)) {
+            if (word === table.getRow(trials[current_trial])[0]) hits++;
+            else misses++;
 
-                current_trial++;
-                close_intervals();
-                close_letters();
-                break;
-              }
-            }
+            current_trial++;
+            close_letter();
+            break;
           }
         }
       }
@@ -279,8 +247,7 @@ function mousePressed() {
 
 // Evoked after the user starts its second (and last) attempt
 function continueTest() {
-  close_intervals();
-  close_letters();
+  close_letter();
 
   // Re-randomize the trial order
   randomizeTrials();
@@ -298,102 +265,62 @@ function continueTest() {
 
 // Creates and positions the UI targets
 function createTargets(target_size, horizontal_gap, vertical_gap) {
-  let offset = 0;
   // Define the margins between targets by dividing the white space
   // for the number of targets minus one
   h_margin = horizontal_gap / (GRID_COLUMNS - 1);
   v_margin = vertical_gap / (GRID_ROWS - 1);
 
-  // Intervals
-  for (let c = 1; c < 7; c++) {
-    let target_x = 40 + (h_margin + target_size) * c + target_size / 2;
-    let target_y = v_margin + target_size + target_size / 2;
-
-    // Find the appropriate label and ID for this target
-    let intervals_index = c - 1;
-    let target_label = letter_intervals[intervals_index];
-
-    let target = new Target(target_x, target_y + 40, target_size, target_label);
-
-    targets[target_label] = { target: target, children: {} };
-  }
-
   // Letters
+  let c = 0;
+  let r = 0;
   for (let i = 0; i < letters.length; i++) {
     // Find the appropriate label for this target
-    let target_label = letters[i];
+    let target_label = i == 0 ? "0%" : letters[i];
 
-    if (
-      target_label == "A" ||
-      target_label == "C" ||
-      target_label == "L" ||
-      target_label == "P" ||
-      target_label == "S"
-    ) {
-      offset = 0;
+    let target_x = 40 + (h_margin + target_size) * c + target_size / 2;
+    let target_y = (v_margin + target_size) * r + target_size / 2;
+
+    let target = new Target(
+      target_x,
+      target_y + 40,
+      target_size,
+      target_label,
+      true
+    );
+    targets[letters[i]] = { target: target, children: {} };
+
+    c++;
+    if (c > GRID_COLUMNS) {
+      c = 0;
+      r++;
     }
-
-    let target_x = 40 + (h_margin + target_size) * offset + target_size / 2;
-    let target_y = (v_margin + target_size) * 3 + target_size / 2;
-
-    let target = new Target(target_x, target_y + 40, target_size, target_label);
-
-    if (target_label >= "A" && target_label <= "B") {
-      targets["A-B"].children[target_label] = { target: target, children: {} };
-    } else if (target_label >= "C" && target_label <= "K") {
-      targets["C-K"].children[target_label] = { target: target, children: {} };
-    } else if (target_label >= "L" && target_label <= "O") {
-      targets["L-O"].children[target_label] = { target: target, children: {} };
-    } else if (target_label >= "P" && target_label <= "R") {
-      targets["P-R"].children[target_label] = { target: target, children: {} };
-    } else {
-      targets["S-Z"].children[target_label] = { target: target, children: {} };
-    }
-
-    offset++;
   }
 
   // Words
-  offset = 0;
-  let r = 3;
+  c = 0;
+  let initial_r = ++r;
   let current_letter = legendas[0][0];
   for (let i = 0; i < legendas.length; i++) {
     if (legendas[i][0] != current_letter) {
       current_letter = legendas[i][0];
-      offset = 0;
-      r = 5;
+      c = 0;
+      r = initial_r;
     }
 
-    let target_x = 40 + (h_margin + target_size) * offset + target_size / 2; // give it some margin from the left border
+    let target_x = 40 + (h_margin + target_size) * c + target_size / 2; // give it some margin from the left border
     let target_y = (v_margin + target_size) * r + target_size / 2;
-    let target = new Target(target_x, target_y + 40, target_size, legendas[i]);
+    let target = new Target(
+      target_x,
+      target_y + 40,
+      target_size,
+      legendas[i],
+      false
+    );
+    targets[current_letter].children[legendas[i]] = { target: target };
 
-    if (current_letter == "0") {
-      targets["0%"].children[legendas[i]] = { target: target };
-    } else if (current_letter >= "A" && current_letter <= "B") {
-      targets["A-B"].children[current_letter].children[legendas[i]] = {
-        target: target,
-      };
-    } else if (current_letter >= "C" && current_letter <= "K") {
-      targets["C-K"].children[current_letter].children[legendas[i]] = {
-        target: target,
-      };
-    } else if (current_letter >= "L" && current_letter <= "O") {
-      targets["L-O"].children[current_letter].children[legendas[i]] = {
-        target: target,
-      };
-    } else if (current_letter >= "P" && current_letter <= "R") {
-      targets["P-R"].children[current_letter].children[legendas[i]] = {
-        target: target,
-      };
-    } else {
-      targets["S-Z"].children[current_letter].children[legendas[i]] = {
-        target: target,
-      };
-    }
-    offset++;
-    if (offset > GRID_COLUMNS) {
-      offset = 0;
+    c++;
+    if (c > GRID_COLUMNS) {
+      c = 0;
       r++;
     }
   }
