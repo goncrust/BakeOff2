@@ -8,8 +8,8 @@ const NUM_OF_TRIALS = 12; // The numbers of trials (i.e., target selections) to 
 const GRID_ROWS = 8; // We divide our 80 targets in a 8x10 grid
 const GRID_COLUMNS = 10; // We divide our 80 targets in a 8x10 grid
 let continue_button;
-let table; // The item list from the "legendas" CSV
-let legendas; // Name column from the table, sorted
+let legendas; // The item list from the "legendas" CSV
+let legendas_sorted; // Name column from the table, sorted
 
 // Metrics
 let testStartTime, testEndTime; // time between the start and end of one attempt (8 trials)
@@ -74,12 +74,12 @@ function is_open(letter) {
 
 // Ensures important data is loaded before the program starts
 function preload() {
-  table = loadTable("legendas.csv", "csv", "header");
+  legendas = loadTable("legendas.csv", "csv", "header");
 }
 
 // Runs once at the start
 function setup() {
-  legendas = table.getColumn("name").sort();
+  legendas_sorted = legendas.getColumn("name").sort();
 
   close_letter();
 
@@ -121,7 +121,7 @@ function draw() {
     fill(color(255, 255, 255));
     textAlign(CENTER);
     text(
-      table.findRow(`${trials[current_trial]}`, "id").getString("name"),
+      legendas.findRow(`${trials[current_trial]}`, "id").getString("name"),
       width / 2,
       height - 30
     );
@@ -218,7 +218,8 @@ function mousePressed() {
         for (const word in targets[letter].children) {
           if (targets[letter].children[word].target.clicked(mouseX, mouseY)) {
             if (
-              table.findRow(word, "name").getNum("id") === trials[current_trial]
+              legendas.findRow(word, "name").getNum("id") ===
+              trials[current_trial]
             )
               hits++;
             else misses++;
@@ -281,9 +282,9 @@ function createTargets(target_size, horizontal_gap, vertical_gap) {
   // Letters
   let c = 0;
   let r = 0;
-  for (let i = 0; i < letters.length; i++) {
+  for (const letter of letters) {
     // Find the appropriate label for this target
-    let target_label = i == 0 ? "0%" : letters[i];
+    let target_label = letter === "0" ? "0%" : letter;
 
     let target_x = 40 + (h_margin + target_size) * c + target_size / 2;
     let target_y = (v_margin + target_size) * r + target_size / 2;
@@ -295,7 +296,7 @@ function createTargets(target_size, horizontal_gap, vertical_gap) {
       target_label,
       true
     );
-    targets[letters[i]] = { target: target, children: {} };
+    targets[letter] = { target: target, children: {} };
 
     c++;
     if (c > GRID_COLUMNS - 1) {
@@ -307,10 +308,10 @@ function createTargets(target_size, horizontal_gap, vertical_gap) {
   // Words
   c = 0;
   let initial_r = ++r;
-  let current_letter = legendas[0][0];
-  for (let i = 0; i < legendas.length; i++) {
-    if (legendas[i][0] != current_letter) {
-      current_letter = legendas[i][0];
+  let current_letter = legendas_sorted[0][0];
+  for (const legenda of legendas_sorted) {
+    if (legenda[0] != current_letter) {
+      current_letter = legenda[0];
       c = 0;
       r = initial_r;
     }
@@ -321,10 +322,10 @@ function createTargets(target_size, horizontal_gap, vertical_gap) {
       target_x,
       target_y + 40,
       target_size,
-      legendas[i],
+      legenda,
       false
     );
-    targets[current_letter].children[legendas[i]] = { target: target };
+    targets[current_letter].children[legenda] = { target: target };
 
     c++;
     if (c > GRID_COLUMNS - 1) {
