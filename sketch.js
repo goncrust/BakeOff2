@@ -298,7 +298,7 @@ function createTargets(target_size, horizontal_gap, vertical_gap) {
     targets[letters[i]] = { target: target, children: {} };
 
     c++;
-    if (c > GRID_COLUMNS) {
+    if (c > GRID_COLUMNS - 1) {
       c = 0;
       r++;
     }
@@ -327,7 +327,7 @@ function createTargets(target_size, horizontal_gap, vertical_gap) {
     targets[current_letter].children[legendas[i]] = { target: target };
 
     c++;
-    if (c > GRID_COLUMNS) {
+    if (c > GRID_COLUMNS - 1) {
       c = 0;
       r++;
     }
