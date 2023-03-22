@@ -8,7 +8,7 @@ const NUM_OF_TRIALS = 12; // The numbers of trials (i.e., target selections) to 
 const GRID_ROWS = 8; // We divide our 80 targets in a 8x10 grid
 const GRID_COLUMNS = 10; // We divide our 80 targets in a 8x10 grid
 let continue_button;
-let legendas_table; // The item list from the "legendas" CSV
+let table; // The item list from the "legendas" CSV
 let legendas; // Name column from the table, sorted
 
 // Metrics
@@ -120,7 +120,11 @@ function draw() {
     textFont("Arial", 40);
     fill(color(255, 255, 255));
     textAlign(CENTER);
-    text(legendas[trials[current_trial]], width / 2, height - 30);
+    text(
+      table.findRow(`${trials[current_trial]}`, "id").getString("name"),
+      width / 2,
+      height - 30
+    );
   }
 }
 
@@ -213,7 +217,10 @@ function mousePressed() {
       } else if (is_open(letter)) {
         for (const word in targets[letter].children) {
           if (targets[letter].children[word].target.clicked(mouseX, mouseY)) {
-            if (word === table.getRow(trials[current_trial])[0]) hits++;
+            if (
+              table.findRow(word, "name").getNum("id") === trials[current_trial]
+            )
+              hits++;
             else misses++;
 
             current_trial++;
