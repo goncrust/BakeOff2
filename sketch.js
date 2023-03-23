@@ -120,11 +120,7 @@ function draw() {
     textFont("Arial", 40);
     fill(color(255, 255, 255));
     textAlign(CENTER);
-    text(
-      legendas.findRow(`${trials[current_trial]}`, "id").getString("name"),
-      width / 2,
-      height - 30
-    );
+    text(legendas.getString(trials[current_trial], 0), width / 2, height - 30);
   }
 }
 
