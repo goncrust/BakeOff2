@@ -1,15 +1,18 @@
-// Database (CHANGE THESE!)
+// Database
 const GROUP_NUMBER = 40;
 const RECORD_TO_FIREBASE = false; // Set to 'true' to record user results to Firebase
 
 // Pixel density and setup variables (DO NOT CHANGE!)
 let PPI, PPCM;
 const NUM_OF_TRIALS = 12; // The numbers of trials (i.e., target selections) to be completed
-const GRID_ROWS = 8; // We divide our 80 targets in a 8x10 grid
-const GRID_COLUMNS = 10; // We divide our 80 targets in a 8x10 grid
+const GRID_ROWS = 9; // We divide our targets in a 9x14 grid
+const GRID_COLUMNS = 14;
+const LETTERS_COLUMNS = 6; // Nested grid
+const LETTERS_ROWS = 6;
+const MAX_ROW_LENGTH = 5;
 let continue_button;
 let legendas; // The item list from the "legendas" CSV
-let legendas_sorted; // Name column from the table, sorted
+let legendasObj; // Name column from the table, divided by letter
 
 // Metrics
 let testStartTime, testEndTime; // time between the start and end of one attempt (8 trials)
@@ -58,18 +61,18 @@ const letters = [
 let targets = {};
 
 // State
-let opened_letter = "";
+let openLetter = "";
 
 function close_letter() {
-  opened_letter = "";
+  openLetter = "";
 }
 
 function open_letter(letter) {
-  opened_letter = letter;
+  openLetter = letter;
 }
 
 function is_open(letter) {
-  return letter == opened_letter;
+  return letter == openLetter;
 }
 
 // Ensures important data is loaded before the program starts
@@ -79,7 +82,10 @@ function preload() {
 
 // Runs once at the start
 function setup() {
-  legendas_sorted = legendas.getColumn("name").sort();
+  const legendasColumn = legendas.getColumn("name").sort();
+  legendasObj = {};
+  for (const letter of letters) legendasObj[letter] = [];
+  for (const legenda of legendasColumn) legendasObj[legenda[0]].push(legenda);
 
   close_letter();
 
@@ -107,17 +113,18 @@ function draw() {
     );
 
     // Draw all targets, traversing the target object
-    for (const letter in targets) {
-      targets[letter].target.draw();
-      if (is_open(letter)) {
-        for (const word in targets[letter].children) {
-          targets[letter].children[word].target.draw();
-        }
+    if (openLetter != "") {
+      targets[openLetter].backArrow.draw();
+      for (const word in targets[openLetter].children) {
+        targets[openLetter].children[word].draw();
+      }
+    } else {
+      for (const letter in targets) {
+        targets[letter].target.draw();
       }
     }
-
     // Draw the target label to be selected in the current trial
-    textFont("Arial", 40);
+    textFont("Arial", 20);
     fill(color(255, 255, 255));
     textAlign(CENTER);
     text(legendas.getString(trials[current_trial], 0), width / 2, height - 30);
@@ -206,24 +213,31 @@ function mousePressed() {
   // (i.e., during target selections)
   if (draw_targets) {
     // Check if the user clicked over one of the targets
-    for (const letter in targets) {
-      if (targets[letter].target.clicked(mouseX, mouseY)) {
-        open_letter(letter);
-        break;
-      } else if (is_open(letter)) {
-        for (const word in targets[letter].children) {
-          if (targets[letter].children[word].target.clicked(mouseX, mouseY)) {
+    if (openLetter != "") {
+      if (targets[openLetter].backArrow.clicked(mouseX, mouseY)) close_letter();
+      else {
+        for (const word in targets[openLetter].children) {
+          if (targets[openLetter].children[word].clicked(mouseX, mouseY)) {
             if (
               legendas.findRow(word, "name").getNum("id") ===
               trials[current_trial]
-            )
+            ) {
               hits++;
-            else misses++;
+            } else {
+              misses++;
+            }
 
             current_trial++;
             close_letter();
             break;
           }
+        }
+      }
+    } else {
+      for (const letter in targets) {
+        if (targets[letter].target.clicked(mouseX, mouseY)) {
+          open_letter(letter);
+          break;
         }
       }
     }
@@ -275,57 +289,65 @@ function createTargets(target_size, horizontal_gap, vertical_gap) {
   h_margin = horizontal_gap / (GRID_COLUMNS - 1);
   v_margin = vertical_gap / (GRID_ROWS - 1);
 
-  // Letters
-  let c = 0;
-  let r = 0;
+  let c = 4;
+  let r = 2;
   for (const letter of letters) {
     // Find the appropriate label for this target
     let target_label = letter === "0" ? "0%" : letter;
+    let arrowLabel = "<-";
 
     let target_x = 40 + (h_margin + target_size) * c + target_size / 2;
-    let target_y = (v_margin + target_size) * r + target_size / 2;
+    let target_y = 40 + (v_margin + target_size) * r + target_size / 2;
 
+    // The letter
     let target = new Target(
       target_x,
-      target_y + 40,
+      target_y,
       target_size,
       target_label,
       true
     );
-    targets[letter] = { target: target, children: {} };
 
-    c++;
-    if (c > GRID_COLUMNS - 1) {
-      c = 0;
-      r++;
-    }
-  }
-
-  // Words
-  c = 0;
-  let initial_r = ++r;
-  let current_letter = legendas_sorted[0][0];
-  for (const legenda of legendas_sorted) {
-    if (legenda[0] != current_letter) {
-      current_letter = legenda[0];
-      c = 0;
-      r = initial_r;
-    }
-
-    let target_x = 40 + (h_margin + target_size) * c + target_size / 2; // give it some margin from the left border
-    let target_y = (v_margin + target_size) * r + target_size / 2;
-    let target = new Target(
+    // Back arrow
+    let backArrow = new Target(
       target_x,
-      target_y + 40,
+      target_y,
       target_size,
-      legenda,
-      false
+      arrowLabel,
+      true
     );
-    targets[current_letter].children[legenda] = { target: target };
+
+    // Children
+    const R_LENGTH = Math.min(MAX_ROW_LENGTH, legendasObj[letter].length);
+    let rChild = r + 1;
+    let initialC = c + 1 - Math.ceil(R_LENGTH / 2);
+    while (initialC + R_LENGTH - 1 > GRID_ROWS) initialC--;
+    let cChild = initialC;
+    const children = {};
+    for (const legenda of legendasObj[letter]) {
+      let target_x = 40 + (h_margin + target_size) * cChild + target_size / 2;
+      let target_y = 40 + (v_margin + target_size) * rChild + target_size / 2;
+
+      // The letter
+      let target = new Target(target_x, target_y, target_size, legenda, false);
+      children[legenda] = target;
+
+      cChild++;
+      if (cChild > c + R_LENGTH / 2) {
+        cChild = initialC;
+        rChild++;
+      }
+    }
+
+    targets[letter] = {
+      target: target,
+      backArrow: backArrow,
+      children: children,
+    };
 
     c++;
-    if (c > GRID_COLUMNS - 1) {
-      c = 0;
+    if (c > LETTERS_COLUMNS + 3) {
+      c = 4;
       r++;
     }
   }
@@ -344,7 +366,7 @@ function windowResized() {
     // Below we find out out white space we can have between 2 cm targets
     let screen_width = display.width * 2.54; // screen width
     let screen_height = display.height * 2.54; // screen height
-    let target_size = 2; // sets the target size (will be converted to cm when passed to createTargets)
+    let target_size = 3; // sets the target size (will be converted to cm when passed to createTargets)
     let horizontal_gap = screen_width - target_size * GRID_COLUMNS; // empty space in cm across the x-axis (based on 10 targets per row)
     let vertical_gap = screen_height - target_size * GRID_ROWS; // empty space in cm across the y-axis (based on 8 targets per column)
 
