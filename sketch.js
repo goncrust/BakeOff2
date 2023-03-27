@@ -318,9 +318,9 @@ function createTargets(target_size, horizontal_gap, vertical_gap) {
     );
 
     // Children
-    const R_LENGTH = Math.min(MAX_ROW_LENGTH, legendasObj[letter].length);
+    const R_LENGTH = min(MAX_ROW_LENGTH, legendasObj[letter].length);
     let rChild = r + 1;
-    let initialC = c + 1 - Math.ceil(R_LENGTH / 2);
+    let initialC = c + 1 - ceil(R_LENGTH / 2);
     while (initialC + R_LENGTH - 1 > GRID_ROWS) initialC--;
     let cChild = initialC;
     const children = {};
