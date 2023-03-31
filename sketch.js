@@ -306,15 +306,15 @@ function createTargets(target_size, horizontal_gap, vertical_gap) {
     // Children
     const R_LENGTH = min(MAX_ROW_LENGTH, legendasObj[letter].length);
     let rChild = r + 1;
-    let initialC = c + 1 - ceil(R_LENGTH / 2);
-    while (initialC + R_LENGTH - 1 > GRID_ROWS) initialC--;
+    let initialC = c - floor(R_LENGTH / 2);
+    while (initialC + R_LENGTH > GRID_COLUMNS + 1) initialC--;
     let cChild = initialC;
     const children = {};
     for (const legenda of legendasObj[letter]) {
       let target_x = 40 + (h_margin + target_size) * cChild + target_size / 2;
       let target_y = 40 + (v_margin + target_size) * rChild + target_size / 2;
 
-      // The letter
+      // The word
       const target = new Target(
         target_x,
         target_y,

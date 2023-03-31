@@ -12,9 +12,9 @@ class Target {
   // Checks if a mouse click took place
   // within the target
   clicked(mouse_x, mouse_y) {
-    return this.clickable
-      ? dist(this.x, this.y, mouse_x, mouse_y) < this.width / 2
-      : false;
+    return (
+      this.clickable && dist(this.x, this.y, mouse_x, mouse_y) < this.width / 2
+    );
   }
 
   // Draws the target (i.e., a circle) and its label
