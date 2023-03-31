@@ -1,6 +1,6 @@
 // Database
 const GROUP_NUMBER = 40;
-const RECORD_TO_FIREBASE = false; // Set to 'true' to record user results to Firebase
+const RECORD_TO_FIREBASE = true; // Set to 'true' to record user results to Firebase
 
 // Pixel density and setup variables (DO NOT CHANGE!)
 let PPI, PPCM;
