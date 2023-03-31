@@ -80,6 +80,18 @@ function preload() {
   legendas = loadTable("legendas.csv", "csv", "header");
 }
 
+function startWarning() {
+  // Print warning at the start menu
+  rect(200, 270, 300, 30);
+  describe(
+    "white rect with black outline and round edges in mid-right of canvas"
+  );
+  textFont("Arial", 26);
+  fill(color(0, 0, 0));
+  textAlign(CENTER);
+  text("Display Size is to be 24.5", width / 2, 295);
+}
+
 // Runs once at the start
 function setup() {
   const legendasColumn = legendas.getColumn("name").sort();
@@ -94,6 +106,7 @@ function setup() {
 
   randomizeTrials(); // randomize the trial order at the start of execution
   drawUserIDScreen(); // draws the user start-up screen (student ID and display size)
+  startWarning();
 }
 
 // Runs every frame and redraws the screen
